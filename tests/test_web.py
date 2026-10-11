@@ -22,6 +22,12 @@ def _field_keys(html: str) -> list[str]:
     return re.findall(r'name="field_key" value="([^"]*)"', html)
 
 
+def _blank_id(html: str) -> str:
+    match = re.search(r'<option value="([a-f0-9]{24})">Пустая карточка', html)
+    assert match is not None
+    return match.group(1)
+
+
 def _template_form(name: str, *, include_fields: bool = True) -> list[tuple[str, str]]:
     data = [("name", name)]
     if include_fields:
@@ -111,7 +117,7 @@ def test_ui_template_card_crud_and_blank_protection(web_client: TestClient) -> N
     assert deleted_template.status_code == 303
     assert web_client.get(f"/cards/{card_id}/edit").status_code == 200
 
-    blank_id = re.search(r'<option value="([a-f0-9]{24})">Пустая карточка', web_client.get("/cards/new").text).group(1)
+    blank_id = _blank_id(web_client.get("/cards/new").text)
     assert web_client.get(f"/templates/{blank_id}/edit").status_code == 403
     assert web_client.post(f"/templates/{blank_id}/delete").status_code == 403
 
@@ -229,3 +235,132 @@ def test_ui_rejects_invalid_typed_values_and_paginates(web_client: TestClient) -
     )
     assert invalid_card.status_code == 400
     assert "finite" in invalid_card.text
+    assert "Invalid" not in web_client.get("/cards", params={"q": "Invalid"}).text
+
+
+def test_ui_rejects_missing_title_template_and_duplicate_labels(web_client: TestClient) -> None:
+    blank_id = _blank_id(web_client.get("/cards/new").text)
+    missing_title = web_client.post("/cards/new", data=[("template_id", blank_id)])
+    assert missing_title.status_code == 400
+    assert "title" in missing_title.text
+
+    missing_template = web_client.post("/cards/new", data=[("title", "No template")])
+    assert missing_template.status_code == 400
+    assert "invalid id" in missing_template.text
+
+    duplicate_template = web_client.post(
+        "/templates/new",
+        data=[
+            ("name", "Duplicate labels"),
+            ("field_key", ""), ("field_label", "Same"), ("field_type", "text"), ("field_options", ""),
+            ("field_key", ""), ("field_label", "same"), ("field_type", "text"), ("field_options", ""),
+        ],
+    )
+    assert duplicate_template.status_code == 400
+    assert "unique" in duplicate_template.text
+
+
+def test_ui_blank_creation_and_template_copy_are_independent(web_client: TestClient) -> None:
+    blank = web_client.get("/cards/new")
+    assert blank.status_code == 200
+    blank_id = _blank_id(blank.text)
+    created_blank = web_client.post(
+        "/cards/new",
+        data=[("title", "Title only"), ("template_id", blank_id)],
+        follow_redirects=False,
+    )
+    assert created_blank.status_code == 303
+    blank_card = web_client.get(created_blank.headers["location"])
+    assert "Title only" in blank_card.text
+    assert "field-row" not in blank_card.text
+
+    template = web_client.post(
+        "/templates/new",
+        data=_template_form("Independent"),
+        follow_redirects=False,
+    )
+    template_id = template.headers["location"].split("/")[2]
+    template_page = web_client.get(template.headers["location"])
+    keys = _field_keys(template_page.text)
+    card = web_client.post(
+        "/cards/new",
+        data=[
+            ("title", "Copied fields"),
+            ("template_id", template_id),
+            ("field_key", keys[0]),
+            ("field_label", "Maker"),
+            ("field_type", "text"),
+            ("field_options", ""),
+            ("field_value", "Acme"),
+            ("field_present", "1"),
+            ("field_key", keys[1]),
+            ("field_label", "Count"),
+            ("field_type", "number"),
+            ("field_options", ""),
+            ("field_value", "2"),
+            ("field_present", "1"),
+            ("field_key", keys[2]),
+            ("field_label", "Kind"),
+            ("field_type", "select"),
+            ("field_options", "Food,Tool"),
+            ("field_value", "Tool"),
+            ("field_present", "1"),
+        ],
+        follow_redirects=False,
+    )
+    assert card.status_code == 303
+    card_id = card.headers["location"].split("/")[2]
+
+    edited_template = web_client.post(
+        f"/templates/{template_id}/edit",
+        data=_template_form("Independent changed", include_fields=False),
+        follow_redirects=False,
+    )
+    assert edited_template.status_code == 303
+    card_page = web_client.get(f"/cards/{card_id}/edit")
+    assert "Maker" in card_page.text
+    assert "Independent changed" not in card_page.text
+
+
+def test_ui_filters_cover_boolean_date_and_text_list(web_client: TestClient) -> None:
+    fields = [
+        ("field_key", ""), ("field_label", "Bought"), ("field_type", "date"), ("field_options", ""),
+        ("field_key", ""), ("field_label", "Available"), ("field_type", "boolean"), ("field_options", ""),
+        ("field_key", ""), ("field_label", "Tags"), ("field_type", "text[]"), ("field_options", ""),
+    ]
+    created = web_client.post("/templates/new", data=[("name", "Typed filters"), *fields], follow_redirects=False)
+    template_id = created.headers["location"].split("/")[2]
+    keys = _field_keys(web_client.get(created.headers["location"]).text)
+
+    def create(title: str, bought: str, available: str, tags: str) -> None:
+        assert web_client.post(
+            "/cards/new",
+            data=[
+                ("title", title), ("template_id", template_id),
+                ("field_key", keys[0]), ("field_label", "Bought"), ("field_type", "date"),
+                ("field_options", ""), ("field_value", bought), ("field_present", "1"),
+                ("field_key", keys[1]), ("field_label", "Available"), ("field_type", "boolean"),
+                ("field_options", ""), ("field_value", available), ("field_present", "1"),
+                ("field_key", keys[2]), ("field_label", "Tags"), ("field_type", "text[]"),
+                ("field_options", ""), ("field_value", tags), ("field_present", "1"),
+            ],
+        ).status_code == 303
+
+    create("Fresh", "2025-01-01", "true", "cold,food")
+    create("Old", "2024-01-01", "false", "food")
+    create("Other", "2025-01-02", "true", "tool")
+
+    response = web_client.get(
+        "/cards",
+        params={
+            "template_id": template_id,
+            f"filter_{keys[0]}_min": "2025-01-01",
+            f"filter_{keys[0]}_max": "2025-12-31",
+            f"filter_{keys[1]}": "true",
+            f"filter_{keys[2]}": "cold",
+        },
+    )
+    assert response.status_code == 200
+    assert "Fresh" in response.text
+    assert "Old" not in response.text
+    assert "Other" not in response.text
