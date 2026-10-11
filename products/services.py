@@ -122,14 +122,12 @@ def _assert_unique_labels(fields: list[dict[str, Any]]) -> None:
 
 
 def _date_value(value: Any) -> str:
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
         raise InvalidRequestError("date filter must be YYYY-MM-DD")
     try:
         date.fromisoformat(value)
     except ValueError as exc:
         raise InvalidRequestError("date filter must be YYYY-MM-DD") from exc
-    if len(value) != 10:
-        raise InvalidRequestError("date filter must be YYYY-MM-DD")
     return value
 
 
@@ -278,7 +276,7 @@ class ApplicationService:
             ):
                 raise InvalidRequestError("fields cannot be combined with field operations")
             if fields is not _UNSET:
-                current_fields = validate_fields(fields)
+                current_fields = self._replace_fields(current_fields, fields)
             else:
                 if title is not _UNSET:
                     validate_title(title)
@@ -317,6 +315,54 @@ class ApplicationService:
             return self.persistence.update_card(card_id, title=new_title, fields=current_fields)
 
         return _call(operation)
+
+    def _replace_fields(
+        self,
+        current_fields: list[dict[str, Any]],
+        raw_fields: Any,
+    ) -> list[dict[str, Any]]:
+        if not isinstance(raw_fields, list):
+            raise InvalidRequestError("fields must be a list")
+
+        current_by_key = {field["key"]: field for field in current_fields}
+        fields: list[dict[str, Any]] = []
+        submitted_values: dict[str, Any] = {}
+        conversions: dict[str, dict[str, Any]] = {}
+        allowed = {"key", "label", "type", "options", "value"}
+        for raw in raw_fields:
+            if not isinstance(raw, dict):
+                raise InvalidRequestError("field must be an object")
+            if set(raw) - allowed:
+                validate_field(raw)
+            metadata = {name: value for name, value in raw.items() if name != "value"}
+            field = validate_field(metadata)
+            existing = current_by_key.get(field["key"])
+            target_options = field.get("options")
+            if (
+                existing is not None
+                and existing["type"] != field["type"]
+                and "value" in existing
+            ):
+                field["type"] = existing["type"]
+                if existing["type"] == "select":
+                    field["options"] = existing.get("options")
+                field["value"] = existing["value"]
+                conversions[field["key"]] = {
+                    "type": metadata["type"],
+                    "options": target_options,
+                }
+            if "value" in raw:
+                submitted_values[field["key"]] = raw["value"]
+            fields.append(field)
+
+        if conversions:
+            self._convert_fields(fields, conversions)
+        for field in fields:
+            if field["key"] in submitted_values:
+                field["value"] = validate_value(
+                    field["type"], submitted_values[field["key"]], field.get("options")
+                )
+        return validate_fields(fields)
 
     def add_card_field(
         self,
@@ -383,7 +429,7 @@ class ApplicationService:
                         cast(list[str] | None, options),
                     )
                 except (DomainValidationError, ValueError) as exc:
-                    if not spec.get("confirm", False):
+                    if spec.get("confirm") is not True:
                         raise ConfirmationRequiredError("field conversion requires confirmation") from exc
                     field.pop("value", None)
                 else:

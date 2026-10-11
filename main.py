@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
@@ -161,7 +161,7 @@ def create_app(
         app.state.persistence_error = None
         try:
             app.state.persistence.initialize()
-        except PyMongoError as exc:
+        except Exception as exc:  # noqa: BLE001 - readiness must expose init failures
             app.state.persistence_error = exc
         try:
             async with mcp.session_manager.run():
@@ -171,11 +171,24 @@ def create_app(
                 client.close()
 
     app = FastAPI(title="Products", lifespan=lifespan)
+
+    @app.middleware("http")
+    async def require_same_origin(request: Request, call_next: Any):
+        if request.method == "POST" and not request.url.path.startswith("/mcp"):
+            origin = request.headers.get("origin")
+            scheme = request.headers.get("x-forwarded-proto", request.url.scheme).split(",", 1)[0].strip()
+            expected = f"{scheme}://{request.url.netloc}"
+            if origin != expected:
+                return PlainTextResponse("same-origin request required", status_code=403)
+        return await call_next(request)
+
     app.mount("/static", StaticFiles(directory="products/static"), name="static")
 
     @app.get("/health")
     @app.get("/health/ready")
     def readiness(request: Request) -> dict[str, str]:
+        if request.app.state.persistence_error is not None:
+            raise HTTPException(status_code=503, detail="MongoDB initialization failed")
         try:
             request.app.state.mongo_client.admin.command("ping")
         except PyMongoError as exc:

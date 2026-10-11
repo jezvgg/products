@@ -162,6 +162,26 @@ def test_mcp_tools_share_service_and_require_delete_confirmation(
         remaining = call_tool(client, 13, "search_cards", query="Whole milk")
         assert all(item["id"] != card_id for item in remaining["structuredContent"]["items"])
 
+        conversion_card = call_tool(
+            client,
+            14,
+            "create_card",
+            template_id=template_id,
+            title="Conversion",
+            values={"Brand": "not a number"},
+        )["structuredContent"]
+        for request_id, confirm in ((15, "true"), (16, 1)):
+            rejected_conversion = call_tool(
+                client,
+                request_id,
+                "update_card",
+                card_id=conversion_card["id"],
+                convert_fields={"Brand": {"type": "number", "confirm": confirm}},
+            )
+            assert rejected_conversion["isError"] is True
+            assert "confirmation_required" in rejected_conversion["content"][0]["text"]
+        assert call_tool(client, 17, "get_card", card_id=conversion_card["id"])["structuredContent"]["fields"][0]["value"] == "not a number"
+
 
 def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) -> None:
     settings = Settings(

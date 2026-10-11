@@ -14,7 +14,7 @@ def web_client(mongodb_uri: str) -> Iterator[TestClient]:
         mongodb_uri=mongodb_uri,
         mongodb_database=f"products_web_{uuid4().hex}",
     )
-    with TestClient(create_app(settings)) as client:
+    with TestClient(create_app(settings), headers={"Origin": "http://testserver"}) as client:
         yield client
 
 
@@ -46,6 +46,34 @@ def _template_form(name: str, *, include_fields: bool = True) -> list[tuple[str,
             ("field_options", "Food,Tool"),
         ]
     return data
+
+
+def test_ui_posts_require_same_origin(web_client: TestClient) -> None:
+    allowed = web_client.post(
+        "/templates/new",
+        headers={"Origin": "http://testserver"},
+        data=[("name", "Allowed")],
+        follow_redirects=False,
+    )
+    assert allowed.status_code == 303
+
+    rejected = web_client.post(
+        "/templates/new",
+        headers={"Origin": "https://evil.example"},
+        data=[("name", "Rejected")],
+    )
+    assert rejected.status_code == 403
+
+    blank_id = _blank_id(web_client.get("/cards/new").text)
+    created = web_client.post(
+        "/cards/new", data=[("title", "Protected"), ("template_id", blank_id)], follow_redirects=False
+    )
+    card_id = created.headers["location"].split("/")[2]
+    rejected_delete = web_client.post(
+        f"/cards/{card_id}/delete", headers={"Origin": "https://evil.example"}
+    )
+    assert rejected_delete.status_code == 403
+    assert web_client.get(f"/cards/{card_id}/edit").status_code == 200
 
 
 def test_ui_template_card_crud_and_blank_protection(web_client: TestClient) -> None:
@@ -258,6 +286,26 @@ def test_ui_rejects_missing_title_template_and_duplicate_labels(web_client: Test
     )
     assert duplicate_template.status_code == 400
     assert "unique" in duplicate_template.text
+
+
+def test_blank_card_accepts_first_field(web_client: TestClient) -> None:
+    blank_id = _blank_id(web_client.get("/cards/new").text)
+    created = web_client.post(
+        "/cards/new",
+        data=[
+            ("title", "First field"),
+            ("template_id", blank_id),
+            ("field_key", ""),
+            ("field_label", "Note"),
+            ("field_type", "text"),
+            ("field_options", ""),
+            ("field_value", ""),
+            ("field_present", "0"),
+        ],
+        follow_redirects=False,
+    )
+    assert created.status_code == 303
+    assert "Note" in web_client.get(created.headers["location"]).text
 
 
 def test_ui_blank_creation_and_template_copy_are_independent(web_client: TestClient) -> None:

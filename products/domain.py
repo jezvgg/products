@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from datetime import date
 from math import isfinite
@@ -51,14 +52,12 @@ def validate_value(field_type: str, value: Any, options: list[str] | None = None
         if not isinstance(value, bool):
             raise DomainValidationError("boolean field value must be a boolean")
     elif field_type == "date":
-        if not isinstance(value, str):
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
             raise DomainValidationError("date field value must be YYYY-MM-DD")
         try:
             date.fromisoformat(value)
         except ValueError as exc:
             raise DomainValidationError("date field value must be YYYY-MM-DD") from exc
-        if len(value) != 10:
-            raise DomainValidationError("date field value must be YYYY-MM-DD")
     elif field_type == "select":
         if not isinstance(value, str) or options is None or value not in options:
             raise DomainValidationError("select field value must match an option")

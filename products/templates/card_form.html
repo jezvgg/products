@@ -2,7 +2,7 @@
 {% block content %}
 <h1>{% if card %}Edit card{% else %}New card{% endif %}</h1>
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
-<form method="post" class="editor">
+<form method="post" class="editor" data-card="true">
   <label>Title<input required name="title" value="{{ card.title if card else '' }}"></label>
   {% if not card %}
     <label>Template<select required name="template_id" onchange="location.href='/cards/new?template_id='+encodeURIComponent(this.value)"><option value="">Choose</option>{% for template in templates %}<option value="{{ template.id }}" {% if selected and selected.id == template.id %}selected{% endif %}>{{ template.name }}</option>{% endfor %}</select></label>
