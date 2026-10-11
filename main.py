@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
+from products.mcp import create_mcp_server
 from products.persistence import MongoPersistence
 from products.services import ApplicationService
 
@@ -15,12 +16,14 @@ from products.services import ApplicationService
 class Settings:
     mongodb_uri: str = "mongodb://127.0.0.1:27017"
     mongodb_database: str = "products"
+    mcp_token: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(
             mongodb_uri=os.getenv("MONGODB_URI", cls.mongodb_uri),
             mongodb_database=os.getenv("MONGODB_DATABASE", cls.mongodb_database),
+            mcp_token=os.getenv("MCP_TOKEN", cls.mcp_token),
         )
 
 
@@ -29,10 +32,16 @@ def create_app(
     mongo_client: MongoClient | None = None,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
+    app: FastAPI
+    mcp = create_mcp_server(lambda: app.state.service, settings.mcp_token)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        client = mongo_client if mongo_client is not None else MongoClient(settings.mongodb_uri)
+        client = (
+            mongo_client
+            if mongo_client is not None
+            else MongoClient(settings.mongodb_uri)
+        )
         app.state.mongo_client = client
         app.state.mongo_database = client[settings.mongodb_database]
         app.state.persistence = MongoPersistence(app.state.mongo_database)
@@ -43,7 +52,8 @@ def create_app(
         except PyMongoError as exc:
             app.state.persistence_error = exc
         try:
-            yield
+            async with mcp.session_manager.run():
+                yield
         finally:
             if mongo_client is None:
                 client.close()
@@ -59,6 +69,7 @@ def create_app(
             raise HTTPException(status_code=503, detail="MongoDB unavailable") from exc
         return {"status": "ok"}
 
+    app.mount("/mcp", mcp.streamable_http_app())
     return app
 
 
