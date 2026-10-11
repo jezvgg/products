@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date
 from math import isfinite
 from typing import Any
@@ -119,7 +120,7 @@ def validate_fields(raw_fields: Any, *, template: bool = False) -> list[dict[str
 
 
 def copy_template_fields(fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [dict(field) for field in validate_fields(fields, template=True)]
+    return deepcopy(validate_fields(fields, template=True))
 
 
 def apply_field_values(fields: list[dict[str, Any]], values: Any) -> list[dict[str, Any]]:

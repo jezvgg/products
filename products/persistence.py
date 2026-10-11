@@ -256,6 +256,7 @@ class MongoPersistence:
         *,
         title: Any = None,
         values: Any = None,
+        fields: Any = None,
     ) -> dict[str, Any]:
         object_id = _object_id(card_id)
         current = self.cards.find_one({"_id": object_id})
@@ -264,7 +265,11 @@ class MongoPersistence:
         changes: dict[str, Any] = {"updated_at": _now()}
         if title is not None:
             changes["title"] = validate_title(title)
-        if values is not None:
+        if fields is not None and values is not None:
+            raise DomainValidationError("fields and values cannot be updated together")
+        if fields is not None:
+            changes["fields"] = validate_fields(fields)
+        elif values is not None:
             changes["fields"] = apply_field_values(validate_fields(current["fields"]), values)
         self.cards.update_one({"_id": object_id}, {"$set": changes})
         return _public(_required(self.cards.find_one({"_id": object_id})))

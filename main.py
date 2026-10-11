@@ -8,6 +8,7 @@ from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
 from products.persistence import MongoPersistence
+from products.services import ApplicationService
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +36,7 @@ def create_app(
         app.state.mongo_client = client
         app.state.mongo_database = client[settings.mongodb_database]
         app.state.persistence = MongoPersistence(app.state.mongo_database)
+        app.state.service = ApplicationService(app.state.persistence)
         app.state.persistence_error = None
         try:
             app.state.persistence.initialize()
