@@ -10,6 +10,7 @@ from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
 from products.domain import BLANK_TEMPLATE_NAME
+from products.mcp import create_mcp_server
 from products.persistence import MongoPersistence
 from products.services import ApplicationService, ServiceError
 from products.web import ctx, message, templates
@@ -19,12 +20,14 @@ from products.web import ctx, message, templates
 class Settings:
     mongodb_uri: str = "mongodb://127.0.0.1:27017"
     mongodb_database: str = "products"
+    mcp_token: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(
             mongodb_uri=os.getenv("MONGODB_URI", cls.mongodb_uri),
             mongodb_database=os.getenv("MONGODB_DATABASE", cls.mongodb_database),
+            mcp_token=os.getenv("MCP_TOKEN", cls.mcp_token),
         )
 
 
@@ -33,6 +36,8 @@ def create_app(
     mongo_client: MongoClient | None = None,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
+    app: FastAPI
+    mcp = create_mcp_server(lambda: app.state.service, settings.mcp_token)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -47,7 +52,8 @@ def create_app(
         except PyMongoError as exc:
             app.state.persistence_error = exc
         try:
-            yield
+            async with mcp.session_manager.run():
+                yield
         finally:
             if mongo_client is None:
                 client.close()
@@ -141,6 +147,7 @@ def create_app(
     @app.post("/templates/{template_id}/delete")
     def template_delete(request: Request,template_id: str): service(request).delete_template(template_id); return RedirectResponse("/templates",status_code=303)
 
+    app.mount("/mcp", mcp.streamable_http_app())
     return app
 
 
