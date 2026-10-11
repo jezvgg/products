@@ -451,10 +451,13 @@ class ApplicationService:
         if old_type == "select" and new_type == "text":
             return value
         if old_type == "text" and new_type == "number":
-            number = float(value)
-            if not isfinite(number):
-                raise ValueError("number must be finite")
-            return int(number) if number.is_integer() else number
+            try:
+                number = float(value)
+                if not isfinite(number):
+                    raise ValueError("number must be finite")
+                return int(number) if number.is_integer() else number
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError("text is not a number") from exc
         if old_type == "text" and new_type == "boolean":
             if value.casefold() == "true":
                 return True
