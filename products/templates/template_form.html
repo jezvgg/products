@@ -1,1 +1,21 @@
-{% extends 'base.html' %}{% block content %}<h1>{% if item %}Edit template{% else %}New template{% endif %}</h1>{% if error %}<p class="error">{{error}}</p>{% endif %}<form method="post" class="editor"><label>Name<input required name="name" value="{{item.name if item else ''}}"></label><div id="fields">{% for f in (item.fields if item else []) %}<div class="field-row"><input type="hidden" name="field_key" value="{{f.key}}"><input name="field_label" required value="{{f.label}}"><select name="field_type">{% for typ in field_types %}<option {% if typ==f.type %}selected{% endif %}>{{typ}}</option>{% endfor %}</select><input name="field_options" value="{{f.options|join(',') if f.options else ''}}"><button type="button" class="remove-row">Remove</button></div>{% endfor %}</div><button type="button" id="add-field">Add field</button><button>Save</button></form>{% if item %}<form method="post" action="/templates/{{item.id}}/delete"><button class="danger">Delete template</button></form>{% endif %}{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<h1>{% if item %}Edit template{% else %}New template{% endif %}</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post" class="editor">
+  <label>Name<input required name="name" value="{{ item.name if item else '' }}"></label>
+  <div id="fields">
+    {% for field in (item.fields if item else []) %}
+      <div class="field-row">
+        <input type="hidden" name="field_key" value="{{ field.key }}">
+        <input name="field_label" required value="{{ field.label }}" placeholder="Label">
+        <select name="field_type">{% for typ in field_types %}<option {% if typ == field.type %}selected{% endif %}>{{ typ }}</option>{% endfor %}</select>
+        <input name="field_options" value="{{ field.options|join(',') if field.options is defined else '' }}" placeholder="Select options, comma separated">
+        <button type="button" class="remove-row">Remove</button>
+      </div>
+    {% endfor %}
+  </div>
+  <button type="button" id="add-field">Add field</button><button>Save</button>
+</form>
+{% if item %}<form method="post" action="/templates/{{ item.id }}/delete"><button class="danger">Delete template</button></form>{% endif %}
+{% endblock %}
