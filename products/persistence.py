@@ -98,6 +98,14 @@ def _public(document: dict[str, Any]) -> dict[str, Any]:
     result["id"] = str(result.pop("_id"))
     if "template_id" in result:
         result["template_id"] = str(result["template_id"])
+    for key in ("created_at", "updated_at"):
+        timestamp = result.get(key)
+        if isinstance(timestamp, datetime):
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=UTC)
+            result[key] = timestamp.astimezone(UTC).replace(
+                microsecond=timestamp.microsecond // 1000 * 1000
+            )
     return result
 
 

@@ -1,9 +1,12 @@
 from copy import deepcopy
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import pytest
+from bson import BSON, ObjectId
 
 from products.domain import DomainValidationError, validate_value
+from products.persistence import _public
 from products.services import (
     ApplicationService,
     ConfirmationRequiredError,
@@ -99,3 +102,18 @@ def test_dates_require_exact_shape_for_values_and_filters() -> None:
             validate_value("date", value)
         with pytest.raises(InvalidRequestError):
             _date_value(value)
+
+
+def test_public_timestamps_survive_bson_round_trip_in_utc() -> None:
+    document = {
+        "_id": ObjectId(),
+        "created_at": datetime(2026, 10, 11, 12, 0, 0, 123456, tzinfo=UTC),
+        "updated_at": datetime(2026, 10, 11, 12, 0, 0, 789123, tzinfo=UTC),
+    }
+
+    created = _public(document)
+    fetched = _public(BSON(BSON.encode(document)).decode())
+
+    assert created == fetched
+    assert created["created_at"].microsecond == 123000
+    assert created["created_at"].tzinfo == UTC

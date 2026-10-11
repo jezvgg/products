@@ -39,9 +39,12 @@ def _form_string(form: Any, name: str, default: str = "") -> str:
 
 def _parse_number(value: str) -> int | float | str:
     try:
-        return int(value) if "." not in value else float(value)
+        return int(value)
     except ValueError:
-        return value
+        try:
+            return float(value)
+        except ValueError:
+            return value
 
 
 def _parse_form_value(field_type: str, value: str) -> Any:
@@ -120,6 +123,8 @@ def _filter_arguments(template: dict[str, Any], params: Any) -> tuple[dict[str, 
             spec = {"min": minimum} if minimum else {}
             if maximum:
                 spec["max"] = maximum
+            if field["type"] == "number":
+                spec = {bound: _parse_number(value) for bound, value in spec.items()}
             typed.setdefault(f"{field['type']}_filters", {})[key] = spec
             values[key] = {"min": minimum, "max": maximum}
         else:

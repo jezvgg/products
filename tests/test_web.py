@@ -6,8 +6,9 @@ from uuid import uuid4
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from starlette.datastructures import QueryParams
 
-from main import Settings, create_app
+from main import Settings, _filter_arguments, create_app
 
 
 class FormTestClient(TestClient):
@@ -16,6 +17,7 @@ class FormTestClient(TestClient):
         if isinstance(data, list):
             kwargs.pop("data")
             kwargs["content"] = urlencode(data)
+            kwargs.setdefault("follow_redirects", False)
             headers = dict(kwargs.pop("headers", {}) or {})
             headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
             kwargs["headers"] = headers
@@ -30,6 +32,17 @@ def web_client(mongodb_uri: str) -> Iterator[TestClient]:
     )
     with FormTestClient(create_app(settings), headers={"Origin": "http://testserver"}) as client:
         yield client
+
+
+def test_number_filter_query_values_are_parsed_for_service() -> None:
+    template = {"fields": [{"key": "weight", "type": "number"}]}
+    filters, values = _filter_arguments(
+        template,
+        QueryParams({"filter_weight_min": "3", "filter_weight_max": "6.5"}),
+    )
+
+    assert filters == {"number_filters": {"weight": {"min": 3, "max": 6.5}}}
+    assert values == {"weight": {"min": "3", "max": "6.5"}}
 
 
 def test_form_test_client_encodes_repeated_form_fields() -> None:
@@ -51,7 +64,7 @@ def _field_keys(html: str) -> list[str]:
 
 
 def _blank_id(html: str) -> str:
-    match = re.search(r'<option value="([a-f0-9]{24})">Пустая карточка', html)
+    match = re.search(r'<option value="([a-f0-9]{24})"\s*>Пустая карточка', html)
     assert match is not None
     return match.group(1)
 
