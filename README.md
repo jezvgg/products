@@ -15,6 +15,7 @@ Minimal FastAPI application for household cards.
 | --- | --- |
 | `MONGODB_URI` | `mongodb://127.0.0.1:27017` |
 | `MONGODB_DATABASE` | `products` |
+| `MCP_TOKEN` | empty; MCP requests are rejected |
 | `TEST_MONGODB_URI` | unset; starts MongoDB with Testcontainers |
 
 ## Development
@@ -51,4 +52,4 @@ Rotate the MCP token by replacing `MCP_TOKEN` in `.env` with a new `openssl rand
 docker compose up -d --force-recreate app
 ```
 
-Never commit `.env` or put the token in a URL or log.
+MCP clients use `/mcp/` with `Authorization: Bearer <MCP_TOKEN>`. Never commit `.env` or put the token in a URL or log.
