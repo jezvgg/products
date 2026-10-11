@@ -19,7 +19,7 @@ def mongodb_uri() -> Iterator[str]:
     try:
         mongo = MongoDbContainer("mongo:7")
         mongo.start()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         pytest.skip(f"MongoDB test strategy unavailable: {exc}")
         return
 
