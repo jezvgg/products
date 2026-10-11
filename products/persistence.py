@@ -124,7 +124,9 @@ class MongoPersistence:
     def initialize(self) -> None:
         self._configure_collection("templates", TEMPLATE_VALIDATOR)
         self._configure_collection("cards", CARD_VALIDATOR)
-        self.templates.create_index([("name", ASCENDING)], unique=True, name="templates_name_unique")
+        self.templates.create_index(
+            [("name", ASCENDING)], unique=True, name="templates_name_unique"
+        )
         self.cards.create_index([("updated_at", DESCENDING)], name="cards_updated_at_desc")
         self.cards.create_index(
             [("template_id", ASCENDING), ("updated_at", DESCENDING)],

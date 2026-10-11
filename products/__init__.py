@@ -3,11 +3,9 @@ from .services import (
     ConfirmationRequiredError,
     ConflictError,
     InvalidRequestError,
-    NotFoundError,
     ResourceNotFoundError,
     ServiceError,
     StorageError,
-    ValidationError,
 )
 
 __all__ = [
@@ -15,9 +13,7 @@ __all__ = [
     "ConfirmationRequiredError",
     "ConflictError",
     "InvalidRequestError",
-    "NotFoundError",
     "ResourceNotFoundError",
     "ServiceError",
     "StorageError",
-    "ValidationError",
 ]

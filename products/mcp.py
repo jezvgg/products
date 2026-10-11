@@ -19,9 +19,7 @@ class EnvironmentTokenVerifier(TokenVerifier):
         self.expected_token = expected_token
 
     async def verify_token(self, token: str) -> AccessToken | None:
-        if not self.expected_token or not secrets.compare_digest(
-            token, self.expected_token
-        ):
+        if not self.expected_token or not secrets.compare_digest(token, self.expected_token):
             return None
         return AccessToken(token=token, client_id="products-mcp", scopes=[])
 
@@ -38,9 +36,7 @@ def create_mcp_server(service: Callable[[], ApplicationService], token: str) -> 
         streamable_http_path="/",
         json_response=True,
         stateless_http=True,
-        transport_security=TransportSecuritySettings(
-            enable_dns_rebinding_protection=False
-        ),
+        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )
 
     def call(operation: Callable[[ApplicationService], Any]) -> Any:
@@ -59,9 +55,7 @@ def create_mcp_server(service: Callable[[], ApplicationService], token: str) -> 
     def get_card(card_id: str) -> dict[str, Any]:
         return call(lambda app: app.get_card(card_id))
 
-    @mcp.tool(
-        description="Partially update a card and return the complete resulting card."
-    )
+    @mcp.tool(description="Partially update a card and return the complete resulting card.")
     def update_card(
         card_id: str,
         title: str | None = None,
@@ -94,9 +88,7 @@ def create_mcp_server(service: Callable[[], ApplicationService], token: str) -> 
             raise ToolError("confirmation_required: delete_card requires confirm=true")
         return call(lambda app: app.delete_card(card_id))
 
-    @mcp.tool(
-        description="Search cards with UI-compatible filters and a continuation cursor."
-    )
+    @mcp.tool(description="Search cards with UI-compatible filters and a continuation cursor.")
     def search_cards(
         query: str | None = None,
         template_id: str | None = None,
@@ -136,14 +128,10 @@ def create_mcp_server(service: Callable[[], ApplicationService], token: str) -> 
         return call(lambda app: app.get_template(template_id))
 
     @mcp.tool(description="Create a template and return the complete template.")
-    def create_template(
-        name: str, fields: list[dict[str, Any]] | None = None
-    ) -> dict[str, Any]:
+    def create_template(name: str, fields: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         return call(lambda app: app.create_template(name, fields))
 
-    @mcp.tool(
-        description="Partially update a template and return the complete resulting template."
-    )
+    @mcp.tool(description="Partially update a template and return the complete resulting template.")
     def update_template(
         template_id: str,
         name: str | None = None,

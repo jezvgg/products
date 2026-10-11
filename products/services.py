@@ -65,10 +65,6 @@ class StorageError(ServiceError):
     code = "storage_error"
 
 
-NotFoundError = ResourceNotFoundError
-ValidationError = InvalidRequestError
-
-
 def _public(document: dict[str, Any]) -> dict[str, Any]:
     result = deepcopy(document)
     result["id"] = str(result.pop("_id"))
@@ -106,7 +102,11 @@ def _object_id(value: Any) -> ObjectId:
 def _field_position(fields: list[dict[str, Any]], reference: Any) -> int:
     if not isinstance(reference, str) or not reference.strip():
         raise InvalidRequestError("field reference must be a non-empty string")
-    exact = [i for i, field in enumerate(fields) if field["key"] == reference or field["label"] == reference]
+    exact = [
+        i
+        for i, field in enumerate(fields)
+        if field["key"] == reference or field["label"] == reference
+    ]
     if not exact:
         folded = reference.casefold()
         exact = [i for i, field in enumerate(fields) if field["label"].casefold() == folded]
@@ -160,7 +160,14 @@ def _cursor(value: str) -> tuple[datetime, ObjectId]:
         raw = json.loads(base64.urlsafe_b64decode(value.encode()).decode())
         timestamp = datetime.fromisoformat(raw["updated_at"])
         identifier = _object_id(raw["id"])
-    except (ValueError, KeyError, TypeError, json.JSONDecodeError, UnicodeDecodeError, binascii.Error) as exc:
+    except (
+        ValueError,
+        KeyError,
+        TypeError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+        binascii.Error,
+    ) as exc:
         raise InvalidRequestError("invalid cursor") from exc
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=UTC)
@@ -272,7 +279,13 @@ class ApplicationService:
 
             if fields is not _UNSET and any(
                 value is not _UNSET
-                for value in (add_fields, remove_fields, rename_fields, convert_fields, clear_fields)
+                for value in (
+                    add_fields,
+                    remove_fields,
+                    rename_fields,
+                    convert_fields,
+                    clear_fields,
+                )
             ):
                 raise InvalidRequestError("fields cannot be combined with field operations")
             if fields is not _UNSET:
@@ -288,7 +301,9 @@ class ApplicationService:
                         current_fields.append(validate_field(raw))
                     _assert_unique_labels(current_fields)
                 if remove_fields is not _UNSET:
-                    references = remove_fields if isinstance(remove_fields, list) else [remove_fields]
+                    references = (
+                        remove_fields if isinstance(remove_fields, list) else [remove_fields]
+                    )
                     for reference in references:
                         current_fields.pop(_field_position(current_fields, reference))
                 if rename_fields is not _UNSET:
@@ -306,7 +321,9 @@ class ApplicationService:
                 if clear_fields is not _UNSET:
                     references = clear_fields if isinstance(clear_fields, list) else [clear_fields]
                     for reference in references:
-                        current_fields[_field_position(current_fields, reference)].pop("value", None)
+                        current_fields[_field_position(current_fields, reference)].pop(
+                            "value", None
+                        )
                 current_fields = validate_fields(current_fields)
 
             new_title = current["title"] if title is _UNSET else title
@@ -338,11 +355,7 @@ class ApplicationService:
             field = validate_field(metadata)
             existing = current_by_key.get(field["key"])
             target_options = field.get("options")
-            if (
-                existing is not None
-                and existing["type"] != field["type"]
-                and "value" in existing
-            ):
+            if existing is not None and existing["type"] != field["type"] and "value" in existing:
                 field["type"] = existing["type"]
                 if existing["type"] == "select":
                     field["options"] = existing.get("options")
@@ -416,7 +429,14 @@ class ApplicationService:
             new_type = spec["type"]
             options = spec.get("options", field.get("options") if new_type == "select" else None)
             if new_type == "select":
-                validate_field({"key": field["key"], "label": field["label"], "type": new_type, "options": options})
+                validate_field(
+                    {
+                        "key": field["key"],
+                        "label": field["label"],
+                        "type": new_type,
+                        "options": options,
+                    }
+                )
             elif options is not None:
                 raise InvalidRequestError("only select fields may have options")
 
@@ -430,7 +450,9 @@ class ApplicationService:
                     )
                 except (DomainValidationError, ValueError) as exc:
                     if spec.get("confirm") is not True:
-                        raise ConfirmationRequiredError("field conversion requires confirmation") from exc
+                        raise ConfirmationRequiredError(
+                            "field conversion requires confirmation"
+                        ) from exc
                     field.pop("value", None)
                 else:
                     field["value"] = converted
@@ -441,7 +463,9 @@ class ApplicationService:
                 field.pop("options", None)
 
     @staticmethod
-    def _safe_conversion(old_type: str, new_type: str, value: Any, options: list[str] | None) -> Any:
+    def _safe_conversion(
+        old_type: str, new_type: str, value: Any, options: list[str] | None
+    ) -> Any:
         if old_type == new_type:
             return validate_value(new_type, value, options)
         if new_type == "text":
@@ -515,20 +539,31 @@ class ApplicationService:
                 if not isinstance(typed, dict):
                     raise InvalidRequestError(f"{field_type} filters must be an object")
                 for reference, spec in typed.items():
-                    self._add_field_filter(mongo_query, selected_template, reference, spec, field_type)
+                    self._add_field_filter(
+                        mongo_query, selected_template, reference, spec, field_type
+                    )
             if filters is not None:
                 if not isinstance(filters, dict):
                     raise InvalidRequestError("filters must be an object")
                 for reference, spec in filters.items():
                     field_type = self._template_field_type(selected_template, reference)
                     if field_type is None:
-                        raise InvalidRequestError("generic field filters require a selected template")
-                    self._add_field_filter(mongo_query, selected_template, reference, spec, field_type)
+                        raise InvalidRequestError(
+                            "generic field filters require a selected template"
+                        )
+                    self._add_field_filter(
+                        mongo_query, selected_template, reference, spec, field_type
+                    )
 
             if cursor is not None:
                 updated_at, identifier = _cursor(cursor)
                 mongo_query.setdefault("$and", []).append(
-                    {"$or": [{"updated_at": {"$lt": updated_at}}, {"updated_at": updated_at, "_id": {"$lt": identifier}}]}
+                    {
+                        "$or": [
+                            {"updated_at": {"$lt": updated_at}},
+                            {"updated_at": updated_at, "_id": {"$lt": identifier}},
+                        ]
+                    }
                 )
             documents = list(
                 self.persistence.cards.find(mongo_query)
@@ -570,7 +605,9 @@ class ApplicationService:
         if actual_type != field_type:
             raise InvalidRequestError(f"field is not of type {field_type}")
         field = next(
-            field for field in template["fields"] if field["key"] == reference or field["label"].casefold() == str(reference).casefold()
+            field
+            for field in template["fields"]
+            if field["key"] == reference or field["label"].casefold() == str(reference).casefold()
         )
         condition: Any
         if field_type == "text":
@@ -593,8 +630,6 @@ class ApplicationService:
             if not isinstance(spec, str):
                 raise InvalidRequestError("text-list filter must be a string")
             condition = spec
-        query.setdefault("$and", []).append({"fields": {"$elemMatch": {"key": field["key"], "value": condition}}})
-
-
-# Short name for adapters that prefer an explicit application boundary.
-ApplicationServices = ApplicationService
+        query.setdefault("$and", []).append(
+            {"fields": {"$elemMatch": {"key": field["key"], "value": condition}}}
+        )

@@ -1,21 +1,51 @@
 {% extends 'base.html' %}
+{% block title %}{% if item %}Edit template{% else %}New template{% endif %}{% endblock %}
 {% block content %}
-<h1>{% if item %}Edit template{% else %}New template{% endif %}</h1>
-{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<div class="page-head">
+  <h1>{% if item %}Edit template{% else %}New template{% endif %}</h1>
+  <a class="button" href="/templates">Back to templates</a>
+</div>
+
+{% if error %}<p class="notice notice-error">{{ error }}</p>{% endif %}
+
 <form method="post" class="editor">
-  <label>Name<input required name="name" value="{{ item.name if item else '' }}"></label>
-  <div id="fields">
+  <label class="field">
+    <span class="field-label">Name</span>
+    <input required name="name" value="{{ item.name if item else '' }}">
+  </label>
+
+  <div id="fields" class="fields">
     {% for field in (item.fields if item else []) %}
-      <div class="field-row">
-        <input type="hidden" name="field_key" value="{{ field.key }}">
+    <div class="field-row">
+      <input type="hidden" name="field_key" value="{{ field.key }}">
+      <label class="field">
+        <span class="field-label">Label</span>
         <input name="field_label" required value="{{ field.label }}" placeholder="Label">
-        <select name="field_type">{% for typ in field_types %}<option {% if typ == field.type %}selected{% endif %}>{{ typ }}</option>{% endfor %}</select>
-        <input name="field_options" value="{{ field.options|join(',') if field.options is defined else '' }}" placeholder="Select options, comma separated">
-        <button type="button" class="remove-row">Remove</button>
-      </div>
+      </label>
+      <label class="field">
+        <span class="field-label">Type</span>
+        <select name="field_type">
+          {% for typ in field_types %}<option {% if typ == field.type %}selected{% endif %}>{{ typ }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">Options</span>
+        <input name="field_options" value="{{ field.options|join(',') if field.options is defined else '' }}" placeholder="a, b, c">
+      </label>
+      <button type="button" class="button remove-row" title="Remove this field">Remove</button>
+    </div>
     {% endfor %}
   </div>
-  <button type="button" id="add-field">Add field</button><button>Save</button>
+
+  <div class="actions">
+    <button type="button" class="button" id="add-field">Add field</button>
+    <button class="button button-primary">Save</button>
+  </div>
 </form>
-{% if item %}<form method="post" action="/templates/{{ item.id }}/delete"><button class="danger">Delete template</button></form>{% endif %}
+
+{% if item %}
+<form method="post" action="/templates/{{ item.id }}/delete" class="danger-zone">
+  <button class="button button-danger">Delete template</button>
+</form>
+{% endif %}
 {% endblock %}

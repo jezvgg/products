@@ -1,31 +1,86 @@
 {% extends 'base.html' %}
+{% block title %}Cards{% endblock %}
 {% block content %}
-<h1>Cards</h1>
-{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<div class="page-head">
+  <h1>Cards</h1>
+</div>
+
+{% if error %}<p class="notice notice-error">{{ error }}</p>{% endif %}
+
 <form class="filters" method="get">
-  <label>Title<input name="q" value="{{ query }}" placeholder="Search title"></label>
-  <label>Template<select name="template_id" onchange="this.form.submit()"><option value="">All templates</option>{% for t in templates %}<option value="{{ t.id }}" {% if t.id == selected %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></label>
+  <div class="grid grid-2">
+    <label class="field">
+      <span class="field-label">Title</span>
+      <input name="q" value="{{ query }}" placeholder="Search title">
+    </label>
+    <label class="field">
+      <span class="field-label">Template</span>
+      <select name="template_id" onchange="this.form.submit()">
+        <option value="">All templates</option>
+        {% for t in templates %}
+        <option value="{{ t.id }}" {% if t.id == selected %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
   {% if selected_template %}
-    <fieldset>
-      <legend>Fields</legend>
+  <fieldset class="filters-fields">
+    <legend>Fields</legend>
+    <div class="grid grid-2">
       {% for field in selected_template.fields %}
-        {% set value = filter_values.get(field.key, '') %}
-        <label>{{ field.label }}
-          {% if field.type in ['number', 'date'] %}
-            <span class="range"><input name="filter_{{ field.key }}_min" type="{{ 'number' if field.type == 'number' else 'date' }}" value="{{ value.get('min', '') if value is mapping else '' }}" placeholder="From"><input name="filter_{{ field.key }}_max" type="{{ 'number' if field.type == 'number' else 'date' }}" value="{{ value.get('max', '') if value is mapping else '' }}" placeholder="To"></span>
-          {% elif field.type == 'boolean' %}
-            <select name="filter_{{ field.key }}"><option value="">Any</option><option value="true" {% if value == 'true' %}selected{% endif %}>True</option><option value="false" {% if value == 'false' %}selected{% endif %}>False</option></select>
-          {% elif field.type == 'select' %}
-            <select name="filter_{{ field.key }}"><option value="">Any</option>{% for option in field.options %}<option value="{{ option }}" {% if value == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
-          {% else %}
-            <input name="filter_{{ field.key }}" value="{{ value }}" placeholder="{{ 'Contains' if field.type == 'text' else 'Contains tag' }}">
-          {% endif %}
-        </label>
+      {% set value = filter_values.get(field.key, '') %}
+      <label class="field">
+        <span class="field-label">{{ field.label }}</span>
+        {% if field.type in ['number', 'date'] %}
+        <span class="range">
+          <input name="filter_{{ field.key }}_min" type="{{ 'number' if field.type == 'number' else 'date' }}" value="{{ value.get('min', '') if value is mapping else '' }}" placeholder="From">
+          <input name="filter_{{ field.key }}_max" type="{{ 'number' if field.type == 'number' else 'date' }}" value="{{ value.get('max', '') if value is mapping else '' }}" placeholder="To">
+        </span>
+        {% elif field.type == 'boolean' %}
+        <select name="filter_{{ field.key }}">
+          <option value="">Any</option>
+          <option value="true" {% if value == 'true' %}selected{% endif %}>True</option>
+          <option value="false" {% if value == 'false' %}selected{% endif %}>False</option>
+        </select>
+        {% elif field.type == 'select' %}
+        <select name="filter_{{ field.key }}">
+          <option value="">Any</option>
+          {% for option in field.options %}
+          <option value="{{ option }}" {% if value == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input name="filter_{{ field.key }}" value="{{ value }}" placeholder="{{ 'Contains' if field.type == 'text' else 'Contains tag' }}">
+        {% endif %}
+      </label>
       {% endfor %}
-    </fieldset>
+    </div>
+  </fieldset>
   {% endif %}
-  <button>Filter</button>
+
+  <div class="actions">
+    <button class="button button-primary">Filter</button>
+  </div>
 </form>
-<ul class="cards">{% for card in cards %}<li><a href="/cards/{{ card.id }}/edit">{{ card.title }}</a></li>{% else %}<li>No cards</li>{% endfor %}</ul>
-{% if next_url %}<a class="button" href="{{ next_url }}">More</a>{% endif %}
+
+<ul class="cards">
+  {% for card in cards %}
+  <li class="card">
+    <a class="card-title" href="/cards/{{ card.id }}/edit">{{ card.title }}</a>
+    {% set filled = card.fields | selectattr('value', 'defined') | list %}
+    {% if filled %}
+    <span class="chips">
+      {% for field in filled[:3] %}
+      <span class="chip"><span class="chip-key">{{ field.label }}</span>{{ display_value(field) }}</span>
+      {% endfor %}
+    </span>
+    {% endif %}
+  </li>
+  {% else %}
+  <li>No cards</li>
+  {% endfor %}
+</ul>
+
+{% if next_url %}<a class="button more" href="{{ next_url }}">More</a>{% endif %}
 {% endblock %}
