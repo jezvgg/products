@@ -1,10 +1,21 @@
 {% extends 'base.html' %}
+{% block title %}Templates{% endblock %}
 {% block content %}
-<h1>Templates</h1>
-<a class="button" href="/templates/new">New template</a>
+<div class="page-head">
+  <h1>Templates</h1>
+  <a class="button button-primary" href="/templates/new">New template</a>
+</div>
+
 <ul class="cards">
   {% for template in templates %}
-    <li><span>{{ template.name }}</span>{% if template.name != 'Пустая карточка' %}<span><a href="/templates/{{ template.id }}/edit">Edit</a></span>{% endif %}</li>
+  <li class="card">
+    <span class="card-title">{{ template.name }}</span>
+    {% if template.name != 'Пустая карточка' %}
+    <span class="chips"><a class="button button-small" href="/templates/{{ template.id }}/edit">Edit</a></span>
+    {% else %}
+    <span class="chips"><span class="muted">Built-in</span></span>
+    {% endif %}
+  </li>
   {% endfor %}
 </ul>
 {% endblock %}
