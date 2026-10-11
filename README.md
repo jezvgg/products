@@ -32,3 +32,23 @@ TEST_MONGODB_URI=mongodb://127.0.0.1:27017 uv run pytest
 ```
 
 `/health` and `/health/ready` return `{"status":"ok"}` only when MongoDB responds to `ping`; otherwise they return HTTP 503. The application owns its production-created `MongoClient` and closes it during shutdown. Tests pass a separate database through `Settings`, while `TEST_MONGODB_URI` selects a disposable server.
+
+## Deployment
+
+Compose runs the app and MongoDB on an internal network. MongoDB has no host port; the app is bound to `127.0.0.1:8000` by default for a host-installed Caddy reverse proxy.
+
+```sh
+cp .env.example .env
+openssl rand -hex 32  # put output in MCP_TOKEN in .env
+docker compose up -d --build
+```
+
+Point Caddy at `127.0.0.1:8000`. Keep UI authentication in Caddy; the app does not embed Caddy authentication. Route the MCP endpoint through the same HTTPS app path without a browser-auth challenge so its `Authorization: Bearer` token reaches the app.
+
+Rotate the MCP token by replacing `MCP_TOKEN` in `.env` with a new `openssl rand -hex 32` value, then recreate the app:
+
+```sh
+docker compose up -d --force-recreate app
+```
+
+Never commit `.env` or put the token in a URL or log.
