@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{% if card %}Edit card{% else %}New card{% endif %}</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post" class="editor" data-card="true">
+  <label>Title<input required name="title" value="{{ card.title if card else '' }}"></label>
+  {% if not card %}
+    <label>Template<select required name="template_id" onchange="location.href='/cards/new?template_id='+encodeURIComponent(this.value)"><option value="">Choose</option>{% for template in templates %}<option value="{{ template.id }}" {% if selected and selected.id == template.id %}selected{% endif %}>{{ template.name }}</option>{% endfor %}</select></label>
+  {% endif %}
+  <div id="fields">
+    {% for field in (submitted_fields if submitted_fields is defined else (card.fields if card else (selected.fields if selected else []))) %}
+      <div class="field-row">
+        <input type="hidden" name="field_key" value="{{ field.key }}">
+        <input name="field_label" required value="{{ field.label }}" placeholder="Label">
+        <select name="field_type">{% for typ in field_types %}<option {% if typ == field.type %}selected{% endif %}>{{ typ }}</option>{% endfor %}</select>
+        <input name="field_options" value="{{ field.options|join(',') if field.options is defined else '' }}" placeholder="Select options, comma separated">
+        <input name="field_value" value="{% if field.value is defined %}{% if field.type == 'text[]' %}{{ field.value|join(',') }}{% elif field.type == 'boolean' %}{{ 'true' if field.value else 'false' }}{% else %}{{ field.value }}{% endif %}{% endif %}" placeholder="Value">
+        <input type="hidden" name="field_present" value="{{ '1' if field.value is defined else '0' }}">
+        <button type="button" class="remove-row">Remove</button>
+      </div>
+    {% endfor %}
+  </div>
+  {% if card %}<label><input type="checkbox" name="confirm_conversion">Confirm risky conversion</label>{% endif %}
+  <button type="button" id="add-field">Add field</button><button>Save</button>
+</form>
+{% if card %}<form method="post" action="/cards/{{ card.id }}/delete"><button class="danger">Delete permanently</button></form>{% endif %}
+{% endblock %}
