@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from testcontainers.mongodb import MongoDbContainer
+from testcontainers.community.mongodb import MongoDbContainer
 
 from main import Settings, create_app
 
@@ -16,11 +16,12 @@ def mongodb_uri() -> Iterator[str]:
         yield configured_uri
         return
 
-    mongo = MongoDbContainer("mongo:7")
     try:
+        mongo = MongoDbContainer("mongo:7")
         mongo.start()
     except Exception as exc:
         pytest.skip(f"MongoDB test strategy unavailable: {exc}")
+        return
 
     try:
         yield mongo.get_connection_url()
