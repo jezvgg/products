@@ -21,6 +21,8 @@ from .domain import (
     apply_field_values,
     validate_field,
     validate_fields,
+    validate_template_name,
+    validate_title,
     validate_value,
 )
 from .persistence import MongoPersistence
@@ -206,8 +208,10 @@ class ApplicationService:
     ) -> dict[str, Any]:
         kwargs: dict[str, Any] = {}
         if name is not _UNSET:
+            validate_template_name(name)
             kwargs["name"] = name
         if fields is not _UNSET:
+            validate_fields(fields, template=True)
             kwargs["fields"] = fields
         return _call(lambda: self.persistence.update_template(template_id, **kwargs))
 
@@ -270,6 +274,10 @@ class ApplicationService:
             if fields is not _UNSET:
                 current_fields = validate_fields(fields)
             else:
+                if title is not _UNSET:
+                    validate_title(title)
+                if values is not _UNSET and values is None:
+                    raise InvalidRequestError("values must be an object")
                 if add_fields is not _UNSET:
                     additions = add_fields if isinstance(add_fields, list) else [add_fields]
                     for raw in additions:
@@ -298,6 +306,8 @@ class ApplicationService:
                 current_fields = validate_fields(current_fields)
 
             new_title = current["title"] if title is _UNSET else title
+            if title is not _UNSET:
+                validate_title(new_title)
             return self.persistence.update_card(card_id, title=new_title, fields=current_fields)
 
         return _call(operation)
