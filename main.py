@@ -264,14 +264,8 @@ def create_app(
             card = svc.create_card(
                 _form_string(form, "template_id"),
                 _form_string(form, "title"),
-                values={
-                    field["key"]: field["value"]
-                    for field in fields
-                    if "key" in field and "value" in field
-                },
+                fields=fields,
             )
-            if any("key" not in field for field in fields):
-                card = svc.update_card(card["id"], fields=fields)
         except ServiceError as exc:
             try:
                 selected = template_or_none(svc, _form_string(form, "template_id"))

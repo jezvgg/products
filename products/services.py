@@ -229,8 +229,14 @@ class ApplicationService:
         title: Any,
         *,
         values: Any = None,
+        fields: Any = _UNSET,
     ) -> dict[str, Any]:
-        return _call(lambda: self.persistence.create_card(template_id, title, values=values))
+        kwargs: dict[str, Any] = {"values": values}
+        if fields is not _UNSET:
+            if values is not None:
+                raise InvalidRequestError("fields and values cannot be provided together")
+            kwargs["fields"] = fields
+        return _call(lambda: self.persistence.create_card(template_id, title, **kwargs))
 
     def get_card(self, card_id: Any) -> dict[str, Any]:
         def operation() -> dict[str, Any]:

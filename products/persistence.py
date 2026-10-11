@@ -224,13 +224,16 @@ class MongoPersistence:
         title: Any,
         *,
         values: Any = None,
+        fields: Any = None,
     ) -> dict[str, Any]:
         template_object_id = _object_id(template_id)
         template = self.templates.find_one({"_id": template_object_id})
         if template is None:
             raise DomainValidationError("template not found")
-        fields = copy_template_fields(template["fields"])
-        fields = apply_field_values(fields, values)
+        if fields is None:
+            fields = apply_field_values(copy_template_fields(template["fields"]), values)
+        else:
+            fields = validate_fields(fields)
         now = _now()
         document = {
             "_id": ObjectId(),
