@@ -1,11 +1,25 @@
 import re
 from collections.abc import Iterator
+from urllib.parse import urlencode
 from uuid import uuid4
 
 import pytest
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from main import Settings, create_app
+
+
+class FormTestClient(TestClient):
+    def post(self, url: str, *args, **kwargs):
+        data = kwargs.get("data")
+        if isinstance(data, list):
+            kwargs.pop("data")
+            kwargs["content"] = urlencode(data)
+            headers = dict(kwargs.pop("headers", {}) or {})
+            headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
+            kwargs["headers"] = headers
+        return super().post(url, *args, **kwargs)
 
 
 @pytest.fixture
@@ -14,8 +28,22 @@ def web_client(mongodb_uri: str) -> Iterator[TestClient]:
         mongodb_uri=mongodb_uri,
         mongodb_database=f"products_web_{uuid4().hex}",
     )
-    with TestClient(create_app(settings), headers={"Origin": "http://testserver"}) as client:
+    with FormTestClient(create_app(settings), headers={"Origin": "http://testserver"}) as client:
         yield client
+
+
+def test_form_test_client_encodes_repeated_form_fields() -> None:
+    app = FastAPI()
+
+    @app.post("/form")
+    async def read_form(request: Request):
+        form = await request.form()
+        return {"name": [str(value) for value in form.getlist("name")]}
+
+    with FormTestClient(app) as client:
+        response = client.post("/form", data=[("name", "one"), ("name", "two")])
+
+    assert response.json() == {"name": ["one", "two"]}
 
 
 def _field_keys(html: str) -> list[str]:

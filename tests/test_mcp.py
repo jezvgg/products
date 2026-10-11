@@ -191,7 +191,7 @@ def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) 
     )
 
     with TestClient(create_app(settings)) as client:
-        templates = call_tool(client, 1, "list_templates")["structuredContent"]
+        templates = call_tool(client, 1, "list_templates")["structuredContent"]["result"]
         blank = next(item for item in templates if item["name"] == "Пустая карточка")
         blank_card = call_tool(
             client, 2, "create_card", template_id=blank["id"], title="Title only"
