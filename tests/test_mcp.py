@@ -11,9 +11,7 @@ MCP_HEADERS = {
 }
 
 
-def mcp_request(
-    client: TestClient, request_id: int, method: str, **params: object
-) -> dict:
+def mcp_request(client: TestClient, request_id: int, method: str, **params: object) -> dict:
     response = client.post(
         "/mcp/",
         headers=MCP_HEADERS,
@@ -23,9 +21,7 @@ def mcp_request(
     return response.json()
 
 
-def call_tool(
-    client: TestClient, request_id: int, tool_name: str, **arguments: object
-) -> dict:
+def call_tool(client: TestClient, request_id: int, tool_name: str, **arguments: object) -> dict:
     result = mcp_request(
         client,
         request_id,
@@ -114,9 +110,7 @@ def test_mcp_tools_share_service_and_require_delete_confirmation(
         card_id = card["id"]
         assert card["fields"][0]["value"] == "Acme"
 
-        updated = call_tool(
-            client, 5, "update_card", card_id=card_id, title="Whole milk"
-        )
+        updated = call_tool(client, 5, "update_card", card_id=card_id, title="Whole milk")
         assert updated["structuredContent"]["title"] == "Whole milk"
         assert updated["structuredContent"]["fields"][0]["value"] == "Acme"
 
@@ -148,10 +142,7 @@ def test_mcp_tools_share_service_and_require_delete_confirmation(
         assert rejected["isError"] is True
         assert "confirm=true" in rejected["content"][0]["text"]
         assert (
-            call_tool(client, 10, "get_card", card_id=card_id)["structuredContent"][
-                "id"
-            ]
-            == card_id
+            call_tool(client, 10, "get_card", card_id=card_id)["structuredContent"]["id"] == card_id
         )
 
         deleted = call_tool(client, 11, "delete_card", card_id=card_id, confirm=True)
@@ -180,7 +171,12 @@ def test_mcp_tools_share_service_and_require_delete_confirmation(
             )
             assert rejected_conversion["isError"] is True
             assert "confirmation_required" in rejected_conversion["content"][0]["text"]
-        assert call_tool(client, 17, "get_card", card_id=conversion_card["id"])["structuredContent"]["fields"][0]["value"] == "not a number"
+        assert (
+            call_tool(client, 17, "get_card", card_id=conversion_card["id"])["structuredContent"][
+                "fields"
+            ][0]["value"]
+            == "not a number"
+        )
 
 
 def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) -> None:
@@ -210,7 +206,10 @@ def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) 
             client, 3, "create_template", name="MCP inventory", fields=template_fields
         )["structuredContent"]
         template_id = created_template["id"]
-        assert call_tool(client, 4, "get_template", template_id=template_id)["structuredContent"] == created_template
+        assert (
+            call_tool(client, 4, "get_template", template_id=template_id)["structuredContent"]
+            == created_template
+        )
 
         first = call_tool(
             client,
@@ -278,7 +277,9 @@ def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) 
         assert "Red toolbox" in ui_result.text
         assert "Blue toolbox" not in ui_result.text
 
-        page = call_tool(client, 8, "search_cards", template_id=template_id, limit=1)["structuredContent"]
+        page = call_tool(client, 8, "search_cards", template_id=template_id, limit=1)[
+            "structuredContent"
+        ]
         assert len(page["items"]) == 1
         assert page["next_cursor"]
         next_page = call_tool(
@@ -289,7 +290,9 @@ def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) 
             limit=1,
             cursor=page["next_cursor"],
         )["structuredContent"]
-        assert {item["id"] for item in next_page["items"]} == {first["id"], second["id"]} - {page["items"][0]["id"]}
+        assert {item["id"] for item in next_page["items"]} == {first["id"], second["id"]} - {
+            page["items"][0]["id"]
+        }
 
         updated_card = call_tool(
             client,
@@ -300,7 +303,10 @@ def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) 
             values={"Count": 6},
         )["structuredContent"]
         assert updated_card["title"] == "Red toolbox updated"
-        assert next(field for field in updated_card["fields"] if field["label"] == "Count")["value"] == 6
+        assert (
+            next(field for field in updated_card["fields"] if field["label"] == "Count")["value"]
+            == 6
+        )
 
         changed_template = call_tool(
             client,
@@ -312,13 +318,22 @@ def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) 
         )["structuredContent"]
         assert changed_template["name"] == "MCP inventory changed"
         unchanged_card = call_tool(client, 12, "get_card", card_id=first["id"])["structuredContent"]
-        assert [field["label"] for field in unchanged_card["fields"]] == [field["label"] for field in template_fields]
+        assert [field["label"] for field in unchanged_card["fields"]] == [
+            field["label"] for field in template_fields
+        ]
         duplicate_name = call_tool(client, 22, "create_template", name="MCP inventory changed")
         assert duplicate_name["isError"] is True
 
-        deleted_template = call_tool(client, 13, "delete_template", template_id=template_id)["structuredContent"]
+        deleted_template = call_tool(client, 13, "delete_template", template_id=template_id)[
+            "structuredContent"
+        ]
         assert deleted_template == {"id": template_id, "deleted": True}
-        assert call_tool(client, 14, "get_card", card_id=first["id"])["structuredContent"]["template_id"] == template_id
+        assert (
+            call_tool(client, 14, "get_card", card_id=first["id"])["structuredContent"][
+                "template_id"
+            ]
+            == template_id
+        )
 
         duplicate_one = call_tool(
             client,

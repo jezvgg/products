@@ -77,7 +77,9 @@ def test_persists_typed_template_and_independent_card(client: TestClient) -> Non
         },
     )
     assert card["template_id"] == template["id"]
-    assert [field["key"] for field in card["fields"]] == [field["key"] for field in template["fields"]]
+    assert [field["key"] for field in card["fields"]] == [
+        field["key"] for field in template["fields"]
+    ]
     assert {field["label"]: field["value"] for field in card["fields"]} == {
         "Бренд": "Домик",
         "Количество": 2.5,
@@ -99,7 +101,10 @@ def test_blank_seed_is_idempotent_and_immutable(client: TestClient) -> None:
     blank = next(template for template in templates if template["name"] == "Пустая карточка")
     assert blank["fields"] == []
     assert persistence.seed_blank_template()["id"] == blank["id"]
-    assert len([item for item in persistence.list_templates() if item["name"] == "Пустая карточка"]) == 1
+    assert (
+        len([item for item in persistence.list_templates() if item["name"] == "Пустая карточка"])
+        == 1
+    )
 
     with pytest.raises(ImmutableTemplateError):
         persistence.update_template(blank["id"], name="Изменён")
@@ -115,7 +120,11 @@ def test_rejects_invalid_values_and_duplicate_names(client: TestClient) -> None:
     persistence.create_template("Т", [])
     with pytest.raises(DomainValidationError):
         persistence.create_template("Т", [])
-    blank = next(template for template in persistence.list_templates() if template["name"] == "Пустая карточка")
+    blank = next(
+        template
+        for template in persistence.list_templates()
+        if template["name"] == "Пустая карточка"
+    )
     with pytest.raises(DomainValidationError):
         persistence.create_card(blank["id"], "x", values={"missing": "x"})
 

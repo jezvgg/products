@@ -32,7 +32,7 @@ Set `TEST_MONGODB_URI` to an existing disposable MongoDB when Docker is unavaila
 TEST_MONGODB_URI=mongodb://127.0.0.1:27017 uv run pytest
 ```
 
-`/health` and `/health/ready` return `{"status":"ok"}` only when MongoDB initialization succeeds and responds to `ping`; otherwise they return HTTP 503. The application owns its production-created `MongoClient` and closes it during shutdown. Tests pass a separate database through `Settings`, while `TEST_MONGODB_URI` selects a disposable server.
+`/health` and `/health/ready` return `{"status":"ok"}` only when MongoDB initialization succeeds and responds to `ping`; otherwise they return HTTP 503. Readiness retries initialization, so a MongoDB that becomes available after startup is picked up without restarting the app. The application owns its production-created `MongoClient` and closes it during shutdown. Tests pass a separate database through `Settings`, while `TEST_MONGODB_URI` selects a disposable server.
 
 ## Deployment
 

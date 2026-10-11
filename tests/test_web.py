@@ -6,9 +6,12 @@ from uuid import uuid4
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from pymongo.errors import PyMongoError
 from starlette.datastructures import QueryParams
 
-from main import Settings, _filter_arguments, create_app
+from main import Settings, create_app
+from products.forms import filter_arguments as _filter_arguments
+from products.persistence import MongoPersistence
 
 
 class FormTestClient(TestClient):
@@ -107,7 +110,9 @@ def test_ui_posts_require_same_origin(web_client: TestClient) -> None:
 
     blank_id = _blank_id(web_client.get("/cards/new").text)
     created = web_client.post(
-        "/cards/new", data=[("title", "Protected"), ("template_id", blank_id)], follow_redirects=False
+        "/cards/new",
+        data=[("title", "Protected"), ("template_id", blank_id)],
+        follow_redirects=False,
     )
     card_id = created.headers["location"].split("/")[2]
     rejected_delete = web_client.post(
@@ -118,7 +123,9 @@ def test_ui_posts_require_same_origin(web_client: TestClient) -> None:
 
 
 def test_ui_template_card_crud_and_blank_protection(web_client: TestClient) -> None:
-    response = web_client.post("/templates/new", data=_template_form("Inventory"), follow_redirects=False)
+    response = web_client.post(
+        "/templates/new", data=_template_form("Inventory"), follow_redirects=False
+    )
     assert response.status_code == 303
     template_edit = web_client.get(response.headers["location"])
     assert template_edit.status_code == 200
@@ -196,7 +203,9 @@ def test_ui_template_card_crud_and_blank_protection(web_client: TestClient) -> N
 
 
 def test_ui_typed_filters_and_title_search_are_and_combined(web_client: TestClient) -> None:
-    created = web_client.post("/templates/new", data=_template_form("Filterable"), follow_redirects=False)
+    created = web_client.post(
+        "/templates/new", data=_template_form("Filterable"), follow_redirects=False
+    )
     template_id = created.headers["location"].split("/")[2]
     keys = _field_keys(web_client.get(created.headers["location"]).text)
 
@@ -256,7 +265,11 @@ def test_ui_typed_filters_and_title_search_are_and_combined(web_client: TestClie
 
 
 def test_ui_rejects_invalid_typed_values_and_paginates(web_client: TestClient) -> None:
-    created = web_client.post("/templates/new", data=_template_form("Simple", include_fields=False), follow_redirects=False)
+    created = web_client.post(
+        "/templates/new",
+        data=_template_form("Simple", include_fields=False),
+        follow_redirects=False,
+    )
     template_id = created.headers["location"].split("/")[2]
     for index in range(51):
         response = web_client.post(
@@ -321,8 +334,14 @@ def test_ui_rejects_missing_title_template_and_duplicate_labels(web_client: Test
         "/templates/new",
         data=[
             ("name", "Duplicate labels"),
-            ("field_key", ""), ("field_label", "Same"), ("field_type", "text"), ("field_options", ""),
-            ("field_key", ""), ("field_label", "same"), ("field_type", "text"), ("field_options", ""),
+            ("field_key", ""),
+            ("field_label", "Same"),
+            ("field_type", "text"),
+            ("field_options", ""),
+            ("field_key", ""),
+            ("field_label", "same"),
+            ("field_type", "text"),
+            ("field_options", ""),
         ],
     )
     assert duplicate_template.status_code == 400
@@ -413,27 +432,54 @@ def test_ui_blank_creation_and_template_copy_are_independent(web_client: TestCli
 
 def test_ui_filters_cover_boolean_date_and_text_list(web_client: TestClient) -> None:
     fields = [
-        ("field_key", ""), ("field_label", "Bought"), ("field_type", "date"), ("field_options", ""),
-        ("field_key", ""), ("field_label", "Available"), ("field_type", "boolean"), ("field_options", ""),
-        ("field_key", ""), ("field_label", "Tags"), ("field_type", "text[]"), ("field_options", ""),
+        ("field_key", ""),
+        ("field_label", "Bought"),
+        ("field_type", "date"),
+        ("field_options", ""),
+        ("field_key", ""),
+        ("field_label", "Available"),
+        ("field_type", "boolean"),
+        ("field_options", ""),
+        ("field_key", ""),
+        ("field_label", "Tags"),
+        ("field_type", "text[]"),
+        ("field_options", ""),
     ]
-    created = web_client.post("/templates/new", data=[("name", "Typed filters"), *fields], follow_redirects=False)
+    created = web_client.post(
+        "/templates/new", data=[("name", "Typed filters"), *fields], follow_redirects=False
+    )
     template_id = created.headers["location"].split("/")[2]
     keys = _field_keys(web_client.get(created.headers["location"]).text)
 
     def create(title: str, bought: str, available: str, tags: str) -> None:
-        assert web_client.post(
-            "/cards/new",
-            data=[
-                ("title", title), ("template_id", template_id),
-                ("field_key", keys[0]), ("field_label", "Bought"), ("field_type", "date"),
-                ("field_options", ""), ("field_value", bought), ("field_present", "1"),
-                ("field_key", keys[1]), ("field_label", "Available"), ("field_type", "boolean"),
-                ("field_options", ""), ("field_value", available), ("field_present", "1"),
-                ("field_key", keys[2]), ("field_label", "Tags"), ("field_type", "text[]"),
-                ("field_options", ""), ("field_value", tags), ("field_present", "1"),
-            ],
-        ).status_code == 303
+        assert (
+            web_client.post(
+                "/cards/new",
+                data=[
+                    ("title", title),
+                    ("template_id", template_id),
+                    ("field_key", keys[0]),
+                    ("field_label", "Bought"),
+                    ("field_type", "date"),
+                    ("field_options", ""),
+                    ("field_value", bought),
+                    ("field_present", "1"),
+                    ("field_key", keys[1]),
+                    ("field_label", "Available"),
+                    ("field_type", "boolean"),
+                    ("field_options", ""),
+                    ("field_value", available),
+                    ("field_present", "1"),
+                    ("field_key", keys[2]),
+                    ("field_label", "Tags"),
+                    ("field_type", "text[]"),
+                    ("field_options", ""),
+                    ("field_value", tags),
+                    ("field_present", "1"),
+                ],
+            ).status_code
+            == 303
+        )
 
     create("Fresh", "2025-01-01", "true", "cold,food")
     create("Old", "2024-01-01", "false", "food")
@@ -453,3 +499,17 @@ def test_ui_filters_cover_boolean_date_and_text_list(web_client: TestClient) -> 
     assert "Fresh" in response.text
     assert "Old" not in response.text
     assert "Other" not in response.text
+
+
+def test_ui_reports_storage_failures_instead_of_crashing(
+    web_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(self) -> None:
+        raise PyMongoError("boom")
+
+    monkeypatch.setattr(MongoPersistence, "list_templates", fail)
+
+    response = web_client.get("/cards")
+
+    assert response.status_code == 503
+    assert "storage operation failed" in response.text
