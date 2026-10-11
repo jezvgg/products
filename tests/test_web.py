@@ -304,7 +304,7 @@ def test_ui_rejects_invalid_typed_values_and_paginates(web_client: TestClient) -
     )
     assert invalid_card.status_code == 400
     assert "finite" in invalid_card.text
-    assert "Invalid" not in web_client.get("/cards", params={"q": "Invalid"}).text
+    assert "<li>No cards</li>" in web_client.get("/cards", params={"q": "Invalid"}).text
 
 
 def test_ui_rejects_missing_title_template_and_duplicate_labels(web_client: TestClient) -> None:

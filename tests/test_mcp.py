@@ -313,6 +313,8 @@ def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) 
         assert changed_template["name"] == "MCP inventory changed"
         unchanged_card = call_tool(client, 12, "get_card", card_id=first["id"])["structuredContent"]
         assert [field["label"] for field in unchanged_card["fields"]] == [field["label"] for field in template_fields]
+        duplicate_name = call_tool(client, 22, "create_template", name="MCP inventory changed")
+        assert duplicate_name["isError"] is True
 
         deleted_template = call_tool(client, 13, "delete_template", template_id=template_id)["structuredContent"]
         assert deleted_template == {"id": template_id, "deleted": True}
@@ -373,8 +375,6 @@ def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) 
             fields=[{"label": "Value", "type": "object"}],
         )
         assert invalid_type["isError"] is True
-        duplicate_name = call_tool(client, 22, "create_template", name="MCP inventory changed")
-        assert duplicate_name["isError"] is True
         invalid_select = call_tool(
             client,
             23,
