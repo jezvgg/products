@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block content %}<h1>Templates</h1><a class="button" href="/templates/new">New template</a><ul class="cards">{% for t in templates %}<li>{{t.name}}{% if t.name != 'Пустая карточка' %}<a href="/templates/{{t.id}}/edit">Edit</a>{% endif %}</li>{% endfor %}</ul>{% endblock %}
