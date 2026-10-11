@@ -23,6 +23,10 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+LABEL org.opencontainers.image.source="https://github.com/jezvgg/products" \
+      org.opencontainers.image.title="Products" \
+      org.opencontainers.image.description="Minimal FastAPI application for household cards"
+
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/main.py ./main.py
 COPY --from=builder /app/products ./products
