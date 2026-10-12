@@ -128,6 +128,11 @@ a {
   margin-left: auto;
 }
 
+/* ---------- login ---------- */
+.login-form {
+  max-width: 24rem;
+}
+
 /* ---------- buttons ---------- */
 .button,
 button {

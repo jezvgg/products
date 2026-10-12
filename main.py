@@ -11,13 +11,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
+from products import auth
 from products.mcp import create_mcp_server
 from products.persistence import MongoPersistence
 from products.services import ApplicationService, ServiceError
@@ -26,6 +28,7 @@ from products.web import build_router, error_response
 DEFAULT_MONGODB_URI = "mongodb://127.0.0.1:27017"
 DEFAULT_MONGODB_DATABASE = "products"
 DEFAULT_MCP_TOKEN = ""
+DEFAULT_UI_PASSWORD = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +43,7 @@ class Settings:
     mongodb_uri: str = DEFAULT_MONGODB_URI
     mongodb_database: str = DEFAULT_MONGODB_DATABASE
     mcp_token: str = DEFAULT_MCP_TOKEN
+    ui_password: str = DEFAULT_UI_PASSWORD
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -47,6 +51,7 @@ class Settings:
             mongodb_uri=os.getenv("MONGODB_URI", DEFAULT_MONGODB_URI),
             mongodb_database=os.getenv("MONGODB_DATABASE", DEFAULT_MONGODB_DATABASE),
             mcp_token=os.getenv("MCP_TOKEN", DEFAULT_MCP_TOKEN),
+            ui_password=os.getenv("UI_PASSWORD", DEFAULT_UI_PASSWORD),
         )
 
 
@@ -99,6 +104,25 @@ def create_app(
                 return PlainTextResponse("same-origin request required", status_code=403)
         return await call_next(request)
 
+    @app.middleware("http")
+    async def require_ui_session(request: Request, call_next: Any):
+        """Gate every HTML route behind the login cookie (see :mod:`products.auth`)."""
+        if auth.is_exempt(request.url.path) or auth.token_is_valid(
+            settings.ui_password, request.cookies.get(auth.COOKIE_NAME)
+        ):
+            return await call_next(request)
+        if request.method in ("GET", "HEAD"):
+            target = request.url.path
+            if request.url.query:
+                target = f"{target}?{request.url.query}"
+            return RedirectResponse(
+                f"{auth.LOGIN_PATH}?next={quote(target, safe='')}", status_code=303
+            )
+        # Browsers only post forms from a page they were allowed to open; anything
+        # else (a stale tab, curl) is told to authenticate instead of being shown
+        # an error page it cannot act on.
+        return PlainTextResponse("authentication required", status_code=401)
+
     @app.exception_handler(ServiceError)
     async def handle_service_error(request: Request, exc: ServiceError) -> HTMLResponse:
         # Routes that can render a useful form handle their own errors; anything
@@ -124,7 +148,7 @@ def create_app(
             raise HTTPException(status_code=503, detail="MongoDB unavailable") from exc
         return {"status": "ok"}
 
-    app.include_router(build_router())
+    app.include_router(build_router(settings.ui_password))
     app.mount("/mcp", mcp.streamable_http_app())
     return app
 

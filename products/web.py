@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from .auth import COOKIE_NAME, SESSION_TTL_SECONDS, issue_token, password_matches, safe_next
 from .domain import BLANK_TEMPLATE_NAME
 from .forms import filter_arguments, form_string, parse_fields
 from .services import ApplicationService, ServiceError
@@ -67,12 +68,62 @@ def error_response(request: Request, exc: ServiceError) -> HTMLResponse:
     )
 
 
-def build_router() -> APIRouter:
-    """Build the HTML router for cards and templates."""
+def build_router(ui_password: str) -> APIRouter:
+    """Build the HTML router for the login form, cards and templates."""
     router = APIRouter()
 
     def service(request: Request) -> ApplicationService:
         return request.app.state.service
+
+    def request_is_https(request: Request) -> bool:
+        """Read the scheme the way the same-origin guard does: through the proxy."""
+        scheme = (
+            request.headers.get("x-forwarded-proto", request.url.scheme).split(",", 1)[0].strip()
+        )
+        return scheme == "https"
+
+    def login_page(
+        request: Request, *, next_target: str = "", error: str | None = None, status_code: int = 200
+    ) -> HTMLResponse | PlainTextResponse:
+        if not ui_password:
+            # Fail closed and loudly: the app cannot check a password it was not given,
+            # so it must not serve the UI at all.
+            return PlainTextResponse("UI_PASSWORD is not configured", status_code=503)
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context=context(request, next=next_target, error=error),
+            status_code=status_code,
+        )
+
+    @router.get("/login")
+    def login_form(request: Request, next: str = ""):
+        return login_page(request, next_target=safe_next(next or None))
+
+    @router.post("/login")
+    async def login_submit(request: Request):
+        form = await request.form()
+        candidate = form_string(form, "password")
+        target = safe_next(form_string(form, "next") or None)
+        if not password_matches(ui_password, candidate):
+            return login_page(request, next_target=target, error="Wrong password", status_code=401)
+        response = RedirectResponse(target, status_code=303)
+        response.set_cookie(
+            COOKIE_NAME,
+            issue_token(ui_password),
+            max_age=SESSION_TTL_SECONDS,
+            path="/",
+            httponly=True,
+            samesite="lax",
+            secure=request_is_https(request),
+        )
+        return response
+
+    @router.get("/logout")
+    def logout() -> RedirectResponse:
+        response = RedirectResponse("/login", status_code=303)
+        response.delete_cookie(COOKIE_NAME, path="/")
+        return response
 
     def template_or_none(svc: ApplicationService, template_id: str) -> dict[str, Any] | None:
         if not template_id:
