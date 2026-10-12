@@ -3,8 +3,10 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from main import Settings, create_app
+from products.auth import COOKIE_NAME, issue_token
 
 MCP_TEST_TOKEN = "test" + "-token"
+UI_TEST_PASSWORD = "test-password"
 MCP_HEADERS = {
     "Accept": "application/json, text/event-stream",
     "Authorization": f"Bearer {MCP_TEST_TOKEN}",
@@ -184,9 +186,13 @@ def test_mcp_covers_typed_filters_template_crud_and_ui_parity(mongodb_uri: str) 
         mongodb_uri=mongodb_uri,
         mongodb_database=f"products_mcp_acceptance_{uuid4().hex}",
         mcp_token=MCP_TEST_TOKEN,
+        ui_password=UI_TEST_PASSWORD,
     )
 
-    with TestClient(create_app(settings)) as client:
+    with TestClient(
+        create_app(settings),
+        cookies={COOKIE_NAME: issue_token(UI_TEST_PASSWORD)},
+    ) as client:
         templates = call_tool(client, 1, "list_templates")["structuredContent"]["result"]
         blank = next(item for item in templates if item["name"] == "Пустая карточка")
         blank_card = call_tool(

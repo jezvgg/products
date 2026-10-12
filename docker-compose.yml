@@ -6,6 +6,7 @@ services:
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
       MONGODB_DATABASE: ${MONGODB_DATABASE:-products}
       MCP_TOKEN: ${MCP_TOKEN:?MCP_TOKEN must be set in .env}
+      UI_PASSWORD: ${UI_PASSWORD:?UI_PASSWORD must be set in .env}
     depends_on:
       mongo:
         condition: service_healthy

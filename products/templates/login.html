@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in · Products</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main class="page login">
+      <div class="page-head">
+        <h1>Products</h1>
+      </div>
+
+      {% if error %}<p class="notice notice-error">{{ error }}</p>{% endif %}
+
+      <form method="post" action="/login" class="editor login-form">
+        <input type="hidden" name="next" value="{{ next }}">
+        <label class="field">
+          <span class="field-label">Password</span>
+          <input required type="password" name="password" autocomplete="current-password" autofocus>
+        </label>
+        <div class="actions">
+          <button class="button button-primary" type="submit">Sign in</button>
+        </div>
+      </form>
+    </main>
+  </body>
+</html>

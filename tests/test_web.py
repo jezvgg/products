@@ -10,6 +10,7 @@ from pymongo.errors import PyMongoError
 from starlette.datastructures import QueryParams
 
 from main import Settings, create_app
+from products.auth import COOKIE_NAME, issue_token
 from products.forms import filter_arguments as _filter_arguments
 from products.persistence import MongoPersistence
 
@@ -27,13 +28,21 @@ class FormTestClient(TestClient):
         return super().post(url, *args, **kwargs)
 
 
+UI_TEST_PASSWORD = "test-password"
+
+
 @pytest.fixture
 def web_client(mongodb_uri: str) -> Iterator[TestClient]:
     settings = Settings(
         mongodb_uri=mongodb_uri,
         mongodb_database=f"products_web_{uuid4().hex}",
+        ui_password=UI_TEST_PASSWORD,
     )
-    with FormTestClient(create_app(settings), headers={"Origin": "http://testserver"}) as client:
+    with FormTestClient(
+        create_app(settings),
+        headers={"Origin": "http://testserver"},
+        cookies={COOKIE_NAME: issue_token(UI_TEST_PASSWORD)},
+    ) as client:
         yield client
 
 
